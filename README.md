@@ -150,4 +150,4 @@ Ao executar o `main.py`, você pode testar diferentes tipos de perguntas para ve
 
 ## 🤝 7. Licença e Créditos
 
-Projeto desenvolvido como atividade acadêmica para a disciplina de **Inteligência Artificial na Prática**.
+Projeto desenvolvido como atividade acadêmica para a disciplina de **Inteligência Atificial - ML & DL**.
