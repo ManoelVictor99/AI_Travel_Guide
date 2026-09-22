@@ -3,46 +3,87 @@ import sys
 from vector_store import indexar_base_de_conhecimento
 
 
+def exibir_menu():
+    print("\n" + "=" * 70)
+    print("🌍 AIGENTE-TURÍSTICO - SISTEMA INTELIGENTE DE VIAGENS")
+    print("=" * 70)
+
+    print("\nExemplos de perguntas:")
+
+    print(" • Monte um roteiro de 3 dias em Paris.")
+    print(" • Quais são os melhores restaurantes veganos do Rio de Janeiro?")
+    print(" • Como ir do aeroporto Charles de Gaulle ao centro de Paris?")
+    print(' • Como dizer "Onde fica o banheiro?" em francês?')
+
+    print("\nDigite 'sair' para encerrar.")
+
+    print("=" * 70)
+
+
+def imprimir_resposta(cadeia_usada: str, resposta: str):
+    print("\n" + "=" * 70)
+    print(f"📌 Módulo Ativado: {cadeia_usada}")
+    print("=" * 70)
+    print()
+
+    print(resposta.strip())
+
+    print("\n" + "=" * 70)
+
+
 def main():
-    print("\n🔍 Verificando/Indexando base de conhecimento no Pinecone...")
 
-    # Garante que a base esteja indexada antes de carregar as chains
-    indexar_base_de_conhecimento()
+    print("\n🔍 Verificando e indexando a base de conhecimento...")
 
-    # Importa as chains APÓS garantir que o índice existe no Pinecone
+    try:
+        indexar_base_de_conhecimento()
+
+    except Exception as e:
+        print(f"\n❌ Erro durante a indexação:\n{e}")
+        return
+
+    # Importa somente após garantir que o índice existe
     from chains import processar_consulta
 
-    print("\n" + "=" * 65)
-    print("🌍 WELCOME TO AIGENTE-TURÍSTICO - SISTEMA INTELIGENTE DE VIAGENS 🏖️")
-    print("=" * 65)
+    exibir_menu()
 
     while True:
-        try:
-            consulta = input(
-                "\n✈️ Digite sua pergunta sobre a viagem (ou 'sair'): "
-            ).strip()
 
-            if consulta.lower() in ["sair", "exit", "quit", "s"]:
-                print("\n👋 Até logo e boa viagem!")
-                break
+        try:
+
+            consulta = input(
+                "\n✈️ Digite sua pergunta sobre a viagem: "
+            ).strip()
 
             if not consulta:
                 continue
 
-            categoria, cadeia_usada, resposta = processar_consulta(consulta)
+            if consulta.lower() in (
+                "sair",
+                "exit",
+                "quit",
+                "q",
+                "s",
+            ):
+                print("\n👋 Obrigado por utilizar o AIgente-Turístico!")
+                print("Boa viagem! 🌎")
+                break
 
-            print("\n" + "=" * 65)
-            print(f"📌 Módulo Ativado: {cadeia_usada}")
-            print("=" * 65)
-            print(resposta)
-            print("=" * 65)
+            categoria, cadeia_usada, resposta = processar_consulta(
+                consulta
+            )
+
+            imprimir_resposta(cadeia_usada, resposta)
 
         except KeyboardInterrupt:
-            print("\n👋 Sistema encerrado pelo usuário.")
+
+            print("\n\n👋 Encerrando o sistema...")
             sys.exit(0)
 
         except Exception as e:
-            print(f"❌ Erro ao processar solicitação: {e}")
+
+            print("\n❌ Ocorreu um erro durante o processamento.")
+            print(e)
 
 
 if __name__ == "__main__":
