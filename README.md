@@ -2,6 +2,14 @@
 
 Sistema Inteligente de Planejamento de Viagens utilizando **LangChain**, **Groq**, **Pinecone** e **Retrieval-Augmented Generation (RAG)**.
 
+
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![LangChain](https://img.shields.io/badge/LangChain-1.x-1C3C3C?style=for-the-badge)
+![Groq](https://img.shields.io/badge/Groq-Qwen3.8--27B-F55036?style=for-the-badge)
+![Pinecone](https://img.shields.io/badge/Pinecone-Vector%20Database-0056D2?style=for-the-badge)
+![RAG](https://img.shields.io/badge/RAG-Retrieval--Augmented--Generation-success?style=for-the-badge)
+
+---
 O sistema identifica automaticamente a intenção da consulta do usuário através de uma **Router Chain** e encaminha a pergunta para uma cadeia especializada.
 
 ---
