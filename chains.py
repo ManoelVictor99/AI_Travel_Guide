@@ -13,69 +13,94 @@ from langchain_core.runnables import (
 from vector_store import obter_retriever
 
 
-# -------------------------------------------------------------------
-# 1. Carregar variáveis de ambiente
-# -------------------------------------------------------------------
+# ==========================================================
+# Carregar variáveis de ambiente
+# ==========================================================
 
 load_dotenv()
 
 
-# -------------------------------------------------------------------
-# 2. Inicializar o LLM via Groq
-# -------------------------------------------------------------------
+# ==========================================================
+# Inicialização do LLM
+# ==========================================================
 
 llm = ChatGroq(
     groq_api_key=os.getenv("GROQ_API_KEY"),
-    model_name="openai/gpt-oss-20b",
-    temperature=0.3,
+    model_name="qwen/qwen3.8-27b",
+    temperature=0.2,
+    max_tokens=1024,
 )
 
 
-# -------------------------------------------------------------------
-# Funções Auxiliares para o RAG (Lazy Loading do Retriever)
-# -------------------------------------------------------------------
+# ==========================================================
+# Funções auxiliares do RAG
+# ==========================================================
 
 def format_docs(docs):
     """
-    Formata os documentos recuperados pelo Pinecone em um único bloco de texto.
+    Concatena os documentos recuperados pelo Pinecone.
     """
+
     if not docs:
-        return "Nenhuma informação específica encontrada na base de conhecimento."
+        return (
+            "Nenhuma informação relevante foi encontrada "
+            "na base de conhecimento."
+        )
 
     return "\n\n".join(
-        f"--- Documento ---\n{doc.page_content}"
+        doc.page_content
         for doc in docs
     )
 
 
 def buscar_contexto_rag(query: str) -> str:
     """
-    Instancia o retriever sob demanda e busca os documentos mais relevantes.
+    Recupera os documentos mais relevantes da base vetorial.
     """
+
     retriever = obter_retriever()
+
     docs = retriever.invoke(query)
 
     return format_docs(docs)
 
 
-# -------------------------------------------------------------------
-# 1. ITINERARY CHAIN (Roteiro de Viagem - Utiliza RAG)
-# -------------------------------------------------------------------
+# ==========================================================
+# 1. ITINERARY CHAIN
+# ==========================================================
 
 itinerary_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             """
-Você é um especialista em criação de roteiros de viagem personalizados.
+Você é um especialista em planejamento de viagens.
 
-Utilize as informações do contexto abaixo para criar um itinerário detalhado dia a dia.
+Utilize PRIMEIRAMENTE o contexto fornecido.
 
-Se o contexto não contiver todas as informações necessárias,
-crie sugestões coerentes baseadas no seu conhecimento,
-mantendo o foco no perfil solicitado.
+Caso alguma informação não esteja presente,
+complemente utilizando seu conhecimento.
 
-Contexto Relevante da Base de Conhecimento:
+Responda sempre em texto simples.
+
+Não utilize Markdown.
+
+Não utilize tabelas.
+
+Organize a resposta por dias.
+
+Exemplo:
+
+Dia 1
+- ...
+
+Dia 2
+- ...
+
+Dia 3
+- ...
+
+Contexto:
 
 {context}
 """,
@@ -94,21 +119,40 @@ itinerary_chain = (
     | StrOutputParser()
 )
 
-
-# -------------------------------------------------------------------
-# 2. LOGISTICS CHAIN (Logística e Transporte)
-# -------------------------------------------------------------------
+# ==========================================================
+# 2. LOGISTICS CHAIN
+# ==========================================================
 
 logistics_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             """
-Você é um assistente especialista em logística de viagens e transportes.
+Você é um especialista em logística de viagens.
 
-Forneça orientações práticas e objetivas sobre como se locomover,
-transporte público/privado, deslocamentos entre aeroportos,
-estações e hotéis, além de dicas de segurança.
+Utilize PRIMEIRAMENTE o contexto recuperado da base de conhecimento.
+
+Caso alguma informação não esteja presente,
+complemente utilizando seu conhecimento.
+
+Responda sempre em texto simples.
+
+Não utilize Markdown.
+
+Não utilize tabelas.
+
+Organize a resposta em tópicos.
+
+Sempre que possível informe:
+
+- Meio de transporte
+- Tempo estimado
+- Custos aproximados
+- Dicas úteis ao turista
+
+Contexto:
+
+{context}
 """,
         ),
         ("human", "{input}"),
@@ -116,34 +160,51 @@ estações e hotéis, além de dicas de segurança.
 )
 
 logistics_chain = (
-    logistics_prompt
+    {
+        "context": RunnableLambda(buscar_contexto_rag),
+        "input": RunnablePassthrough(),
+    }
+    | logistics_prompt
     | llm
     | StrOutputParser()
 )
 
 
-# -------------------------------------------------------------------
-# 3. LOCAL INFO CHAIN (Informações Locais - Utiliza RAG)
-# -------------------------------------------------------------------
+# ==========================================================
+# 3. LOCAL INFO CHAIN
+# ==========================================================
 
 local_info_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             """
-Você é um guia turístico local altamente informado.
+Você é um guia turístico especializado.
 
-Responda às perguntas sobre pontos turísticos,
-restaurantes, horários de funcionamento,
-ingressos e dicas locais.
+Responda utilizando prioritariamente o contexto fornecido.
 
-Baseie-se rigorosamente no contexto fornecido.
+Caso a informação não exista no contexto,
+informe isso educadamente e complemente apenas
+com conhecimento geral quando apropriado.
 
-Se a informação não estiver disponível no contexto,
-informe educadamente que não possui esse detalhe específico
-na base.
+Responda sempre em texto simples.
 
-Contexto Relevante da Base de Conhecimento:
+Não utilize Markdown.
+
+Não utilize tabelas.
+
+Não utilize negrito.
+
+Organize a resposta em tópicos.
+
+Quando listar restaurantes, atrações ou locais,
+utilize o seguinte formato:
+
+• Nome
+  - Localização
+  - Breve descrição
+
+Contexto:
 
 {context}
 """,
@@ -163,21 +224,28 @@ local_info_chain = (
 )
 
 
-# -------------------------------------------------------------------
-# 4. TRANSLATION CHAIN (Guia de Tradução - Bônus)
-# -------------------------------------------------------------------
+# ==========================================================
+# 4. TRANSLATION CHAIN
+# ==========================================================
 
 translation_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             """
-Você é um tradutor e guia linguístico para viajantes.
+Você é um tradutor para turistas.
 
-Forneça a tradução solicitada,
-acompanhada da pronúncia aproximada em português
-e exemplos de frases úteis para situações reais de viagem
-(ex.: pedir a conta, cumprimentar, pedir ajuda).
+Forneça:
+
+- Tradução
+- Pronúncia aproximada em português
+- Um exemplo de utilização
+
+Responda em texto simples.
+
+Não utilize Markdown.
+
+Não utilize tabelas.
 """,
         ),
         ("human", "{input}"),
@@ -190,36 +258,31 @@ translation_chain = (
     | StrOutputParser()
 )
 
-
-# -------------------------------------------------------------------
-# 5. ROUTER CHAIN (Classificador de Intenção)
-# -------------------------------------------------------------------
+# ==========================================================
+# 5. ROUTER CHAIN
+# ==========================================================
 
 router_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             """
-Você é um classificador de intenção de consultas turísticas.
+Você é um classificador de intenção para um assistente de viagens.
 
 Analise a pergunta do usuário e responda APENAS com uma das
-seguintes palavras-chave (sem texto adicional,
-pontuação ou explicações):
+seguintes categorias.
 
-- roteiro-viagem : Se a pergunta pedir um itinerário,
-  plano de dias ou sugestão de roteiro.
+Não explique.
+Não escreva frases.
+Não utilize pontuação.
 
-- logistica-transporte : Se a pergunta for sobre transporte,
-  trajetos, metrô, voos ou como ir de um lugar a outro.
+Categorias disponíveis:
 
-- info-local : Se a pergunta for sobre pontos turísticos,
-  atrações, restaurantes, horários ou ingressos.
-
-- traducao-idiomas : Se a pergunta for sobre tradução
-  de frases, expressões úteis ou idioma local.
-
-- geral : Se a pergunta não se encaixar claramente
-  em nenhuma das categorias anteriores.
+roteiro-viagem
+logistica-transporte
+info-local
+traducao-idiomas
+geral
 """,
         ),
         ("human", "{input}"),
@@ -233,42 +296,63 @@ router_chain = (
 )
 
 
-# -------------------------------------------------------------------
-# Função Principal de Orquestração do Roteador
-# -------------------------------------------------------------------
+# ==========================================================
+# Função Principal
+# ==========================================================
 
 def processar_consulta(consulta_usuario: str):
     """
-    Classifica a consulta do usuário e a direciona
-    para a cadeia especializada correspondente.
+    Classifica a intenção do usuário e direciona
+    automaticamente para a chain especializada.
     """
 
-    # 1. Classificar intenção via Router Chain
-    categoria_raw = router_chain.invoke({"input": consulta_usuario})
-    categoria = categoria_raw.strip().lower()
+    categoria = (
+        router_chain.invoke(
+            {"input": consulta_usuario}
+        )
+        .strip()
+        .lower()
+    )
 
     print(f"🎯 [Router Chain] Classificação obtida: '{categoria}'")
 
-    # 2. Direcionar para a cadeia responsável
-    if "roteiro-viagem" in categoria:
+    if categoria == "roteiro-viagem":
+
         resposta = itinerary_chain.invoke(consulta_usuario)
-        cadeia_usada = "Itinerary Chain (roteiro-viagem)"
 
-    elif "logistica-transporte" in categoria:
-        resposta = logistics_chain.invoke({"input": consulta_usuario})
-        cadeia_usada = "Logistics Chain (logistica-transporte)"
+        cadeia_usada = "Itinerary Chain"
 
-    elif "info-local" in categoria:
+    elif categoria == "logistica-transporte":
+
+        resposta = logistics_chain.invoke(consulta_usuario)
+
+        cadeia_usada = "Logistics Chain"
+
+    elif categoria == "info-local":
+
         resposta = local_info_chain.invoke(consulta_usuario)
-        cadeia_usada = "Local Info Chain (info-local)"
 
-    elif "traducao-idiomas" in categoria:
-        resposta = translation_chain.invoke({"input": consulta_usuario})
-        cadeia_usada = "Translation Chain (traducao-idiomas)"
+        cadeia_usada = "Local Info Chain"
+
+    elif categoria == "traducao-idiomas":
+
+        resposta = translation_chain.invoke(
+            {"input": consulta_usuario}
+        )
+
+        cadeia_usada = "Translation Chain"
 
     else:
-        # Fallback para consultas gerais
-        resposta = local_info_chain.invoke(consulta_usuario)
-        cadeia_usada = "Local Info Chain (Modo Geral)"
 
-    return categoria, cadeia_usada, resposta
+        # Caso o Router não identifique corretamente,
+        # utiliza a cadeia mais abrangente.
+
+        resposta = local_info_chain.invoke(consulta_usuario)
+
+        cadeia_usada = "Local Info Chain"
+
+    return (
+        categoria,
+        cadeia_usada,
+        resposta,
+    )
