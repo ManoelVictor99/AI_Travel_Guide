@@ -1,153 +1,136 @@
-# 🌍 AIgente-Turístico: Sistema Inteligente de Guia de Viagens com RAG & Router Chains
+🌍 AIgente-Turístico: Sistema Inteligente de Guia de Viagens com RAG
 
-![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![LangChain](https://img.shields.io/badge/LangChain-0.2+-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)
-![Groq](https://img.shields.io/badge/Groq-GPT_OSS_20B-F50057?style=for-the-badge&logo=groq&logoColor=white)
-![Pinecone](https://img.shields.io/badge/Pinecone-Vector_DB-000000?style=for-the-badge&logo=pinecone&logoColor=white)
+Descrição
 
-O **AIgente-Turístico** é um sistema inteligente de assistência ao viajante desenvolvido para classificar automaticamente as intenções das consultas dos usuários e direcioná-las a **Cadeias Especializadas (Chains)** de processamento. A solução combina a orquestração do **LangChain**, a velocidade do motor de inferência **Groq (`openai/gpt-oss-20b`)** e a técnica de **RAG (Retrieval-Augmented Generation)** utilizando o banco vetorial **Pinecone**.
+O AIgente-Turístico é um assistente inteligente para planejamento de
+viagens desenvolvido em Python utilizando LangChain, Groq, Pinecone e
+RAG (Retrieval-Augmented Generation).
 
----
+O sistema classifica automaticamente a intenção da consulta do usuário
+por meio de uma Router Chain e direciona a pergunta para uma cadeia
+especializada:
 
-## 🎯 1. Objetivo do Projeto
+-   Itinerary Chain – criação de roteiros personalizados.
+-   Local Info Chain – informações sobre atrações, restaurantes e pontos
+    turísticos utilizando RAG.
+-   Logistics Chain – logística e transporte utilizando RAG.
+-   Translation Chain – tradução de frases úteis para viagens.
 
-O sistema tem como propósito demonstrar uma arquitetura modular e escalável para assistentes virtuais sem a necessidade de agentes autônomos ilimitados. Ele oferece:
-- **Roteiros Personalizados**: Geração de itinerários detalhados dia a dia com base na base de conhecimento.
-- **Roteamento Inteligente**: Classificação de intenções por uma *Router Chain* que direciona cada dúvida para o módulo correto.
-- **Respostas Precisas via RAG**: Consulta a dados atualizados e específicos de cidades turísticas (como Rio de Janeiro e Paris) indexados em vetores.
-- **Alta Velocidade de Resposta**: Inferência em tempo real fornecida pela LPU da Groq.
+A base de conhecimento é composta por arquivos .txt armazenados na pasta
+knowledge_base, indexados no Pinecone utilizando embeddings do modelo
+sentence-transformers/all-MiniLM-L6-v2.
 
----
+------------------------------------------------------------------------
 
-## 🛠️ 2. Arquitetura e Tecnologias
+Tecnologias Utilizadas
 
-```text
-                               ┌──────────────────────────┐
-                               │   Consulta do Turista    │
-                               └─────────────┬────────────┘
-                                             │
-                                             ▼
-                                 ┌──────────────────────┐
-                                 │     Router Chain     │
-                                 │ (Classifica Intenção)│
-                                 └───────────┬──────────┘
-                                             │
-      ┌──────────────────────┬───────────────┴───────────────┬──────────────────────┐
-      │                      │                               │                      │
-      ▼                      ▼                               ▼                      ▼
-┌─────────────┐    ┌──────────────────┐            ┌──────────────────┐   ┌───────────────────┐
-│ Itinerary   │    │ Local Info Chain │            │ Logistics Chain  │   │ Translation Chain │
-│    Chain    │    │   (Info Local)   │            │   (Logística)    │   │    (Tradução)     │
-└──────┬──────┘    └─────────┬────────┘            └──────────────────┘   └───────────────────┘
-       │                     │
-       └──────────┬──────────┘
-                  │ (Busca RAG)
-                  ▼
-         ┌────────────────┐
-         │ Pinecone DB    │
-         │ (SentenceTrans)│
-         └────────────────┘
-```
+-   Python 3.10+
+-   LangChain 1.x
+-   LangChain Community
+-   LangChain HuggingFace
+-   LangChain Pinecone
+-   LangChain Groq
+-   Pinecone
+-   Groq API
+-   Qwen 3.8 27B
+-   Sentence Transformers
+-   Python Dotenv
 
-### Principais Bibliotecas e Serviços
-- **[LangChain](https://python.langchain.com/)**: Framework para orquestração de prompts, LCEL e fluxos de RAG.
-- **[Groq](https://groq.com/)**: Motor de inferência de altíssimo desempenho configurado com o modelo **`openai/gpt-oss-20b`**.
-- **[Pinecone](https://www.pinecone.io/)**: Banco de dados vetorial em nuvem para armazenamento dos *embeddings*.
-- **[SentenceTransformers](https://www.sbert.net/)**: Modelo `sentence-transformers/all-MiniLM-L6-v2` para geração dos vetores de 384 dimensões.
+------------------------------------------------------------------------
 
----
+Arquitetura
 
-## 📁 3. Estrutura do Repositório
+Usuário │ ▼ Router Chain │ ├──────────────┐ │ │ ▼ ▼ Itinerary Local Info
+│ │ ├──────┬───────┘ │ │ ▼ ▼ Logistics Translation │ ▼ Retriever (MMR) │
+▼ Pinecone │ ▼ Embeddings │ ▼ Qwen (Groq)
 
-```text
-AIgente-turistico/
-│
-├── knowledge_base/               # Arquivos de dados de texto para o RAG
-│   ├── paris.txt                 # Guia de atrações, restaurantes e transporte em Paris
-│   └── rio_de_janeiro.txt        # Guia de atrações, restaurantes e transporte no Rio
-│
-├── .env.example                  # Modelo para configuração das chaves de API
-├── .gitignore                    # Arquivos e pastas ignorados pelo Git
-├── requirements.txt              # Lista de dependências Python
-├── vector_store.py               # Script de geração de embeddings e indexação no Pinecone
-├── chains.py                     # Definição do Router Chain e das Cadeias Especializadas
-├── main.py                       # Interface de linha de comando (CLI) interativa
-└── README.md                     # Documentação oficial do projeto
-```
+------------------------------------------------------------------------
 
----
+Estrutura do Projeto
 
-## ⚙️ 4. Configuração e Instalação
+AIgente-Turistico/ │ ├── knowledge_base/ │ ├── paris.txt │ └──
+rio_de_janeiro.txt │ ├── chains.py ├── vector_store.py ├── main.py ├──
+requirements.txt ├── .env.example ├── README.md
 
-### Pré-requisitos
-- **Python 3.9+** instalado.
-- Chave de API gratuita da **[Groq](https://console.groq.com/)**.
-- Chave de API gratuita do **[Pinecone](https://app.pinecone.io/)**.
+------------------------------------------------------------------------
 
-### Passo a Passo
+Instalação
 
-1. **Clonar o Repositório**:
-   ```bash
-   git clone https://github.com/SEU_USUARIO/AIgente-turistico.git
-   cd AIgente-turistico
-   ```
+1.  Clone o repositório
 
-2. **Criar e Ativar o Ambiente Virtual**:
-   - *Windows:*
-     ```bash
-     python -m venv venv
-     .\venv\Scripts\activate
-     ```
-   - *Linux/macOS:*
-     ```bash
-     python3 -m venv venv
-     source venv/bin/activate
-     ```
+git clone https://github.com/SEU_USUARIO/AIgente-turistico.git
 
-3. **Instalar Dependências**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+2.  Crie um ambiente virtual
 
-4. **Configurar Variáveis de Ambiente**:
-   Crie um arquivo `.env` na raiz do projeto com base no `.env.example`:
-   ```env
-   GROQ_API_KEY="sua_chave_groq_aqui"
-   PINECONE_API_KEY="sua_chave_pinecone_aqui"
-   PINECONE_INDEX_NAME="aigente-turistico"
-   ```
+python -m venv venv
 
----
+3.  Ative o ambiente
 
-## 🚀 5. Como Executar
+Windows: venv
 
-### 1️⃣ Indexar a Base de Conhecimento (Executar 1x)
-Processe os arquivos da pasta `knowledge_base/`, gere os vetores e crie o índice no Pinecone:
-```bash
-python vector_store.py
-```
+Linux/macOS: source venv/bin/activate
 
-### 2️⃣ Iniciar o Assistente
-Inicie a interface CLI do AIgente-Turístico:
-```bash
+4.  Instale as dependências
+
+pip install -r requirements.txt
+
+5.  Configure o arquivo .env
+
+GROQ_API_KEY=“SUA_CHAVE” PINECONE_API_KEY=“SUA_CHAVE”
+PINECONE_INDEX_NAME=“aigente-turistico”
+
+------------------------------------------------------------------------
+
+Execução
+
 python main.py
-```
 
----
+Na inicialização o sistema:
 
-## 🧪 6. Exemplos de Consultas e Testes
+-   Indexa automaticamente a base de conhecimento.
+-   Atualiza o índice do Pinecone.
+-   Carrega o modelo Qwen.
+-   Inicia a interface CLI.
 
-Ao executar o `main.py`, você pode testar diferentes tipos de perguntas para verificar o roteamento automático:
+------------------------------------------------------------------------
 
-| Tipo de Consulta | Exemplo de Pergunta | Módulo Ativado |
-| :--- | :--- | :--- |
-| **Roteiro de Viagem** | *"Monte um roteiro cultural de 3 dias em Paris."* | `Itinerary Chain` |
-| **Informações Locais (RAG)** | *"Quais são os restaurantes veganos no Rio de Janeiro?"* | `Local Info Chain` |
-| **Logística & Transporte** | *"Como ir do aeroporto Charles de Gaulle ao centro de Paris?"* | `Logistics Chain` |
-| **Guia de Tradução** | *"Como pedir a conta educadamente em francês?"* | `Translation Chain` |
+Exemplos
 
----
+Monte um roteiro de 3 dias em Paris.
 
-## 🤝 7. Licença e Créditos
+Quais são os restaurantes veganos do Rio de Janeiro?
 
-Projeto desenvolvido como atividade acadêmica para a disciplina de **Inteligência Atificial - ML & DL**.
+Como ir do aeroporto Charles de Gaulle ao centro de Paris?
+
+Como dizer “Onde fica o banheiro?” em francês?
+
+------------------------------------------------------------------------
+
+Melhorias Implementadas
+
+-   Router Chain para classificação automática.
+-   Arquitetura RAG utilizando Pinecone.
+-   Busca vetorial utilizando MMR.
+-   Reindexação automática evitando documentos duplicados.
+-   Cadeias especializadas para diferentes tipos de consultas.
+-   Embeddings utilizando all-MiniLM-L6-v2.
+-   Integração com Groq utilizando o modelo qwen/qwen3.8-27b.
+-   Interface de linha de comando.
+
+------------------------------------------------------------------------
+
+Próximas Melhorias
+
+-   Inclusão de novas cidades.
+-   Histórico de conversas.
+-   Interface Web.
+-   Geração de mapas.
+-   Reserva de hotéis e voos.
+-   Memória conversacional.
+
+------------------------------------------------------------------------
+
+Licença
+
+Projeto desenvolvido para fins acadêmicos na disciplina de Inteligência
+Artificial na Prática.
